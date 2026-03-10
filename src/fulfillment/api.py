@@ -199,19 +199,23 @@ def create_app(db: FulfillmentDB | None = None, sms: SMSNotifier | None = None, 
     async def get_packing_slip(order_id: int, request: Request):
         if not check_picker_auth(request):
             return JSONResponse({"error": "unauthorized"}, status_code=401)
-        # Look up the ShipStation order ID from our queue DB
         order = db.get_order_by_id(order_id)
         if not order:
             return JSONResponse({"error": "order not found"}, status_code=404)
+        # Fetch full order from ShipStation for ship-to address
+        ss_order_dict = None
         try:
-            pdf_bytes = await ss_api.get_packing_slip([order.shipstation_order_id])
-            return Response(
-                content=pdf_bytes,
-                media_type="application/pdf",
-                headers={"Content-Disposition": f"inline; filename=packing-slip-{order.order_number}.pdf"}
-            )
-        except Exception as e:
-            return JSONResponse({"error": str(e)}, status_code=500)
+            ss_order = await ss_api.get_order(order.shipstation_order_id)
+            ss_order_dict = ss_order.model_dump()
+        except Exception:
+            pass  # Fall back to what we have in our DB
+        from fulfillment.packing_slip import generate_packing_slip
+        pdf_bytes = generate_packing_slip(order, ss_order_dict)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"inline; filename=packing-slip-{order.order_number}.pdf"}
+        )
 
     # --- Stock Alerts ---
 

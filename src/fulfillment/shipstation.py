@@ -223,26 +223,6 @@ class ShipStationAPI:
         data = await self._request("GET", "/shipments", params=params)
         return [ShipStationShipment(**s) for s in data.get("shipments", [])]
 
-    async def get_packing_slip(self, order_ids: list[int]) -> bytes:
-        """Get packing slip PDF for one or more orders. Returns raw PDF bytes."""
-        url = f"{self.base_url}/orders/createpackingslip"
-        if self._rate_limit_remaining <= 1 and time.time() < self._rate_limit_reset:
-            wait = self._rate_limit_reset - time.time()
-            if wait > 0:
-                await asyncio.sleep(wait)
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                url, headers=self.headers,
-                json={"orderIds": order_ids},
-                timeout=30.0,
-            )
-            self._rate_limit_remaining = int(resp.headers.get("X-Rate-Limit-Remaining", 40))
-            reset = resp.headers.get("X-Rate-Limit-Reset")
-            if reset:
-                self._rate_limit_reset = time.time() + int(reset)
-            resp.raise_for_status()
-            return resp.content
-
     async def get_tags(self) -> list[dict]:
         return await self._request("GET", "/accounts/listtags")
 
