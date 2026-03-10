@@ -120,6 +120,9 @@ def create_app(db: FulfillmentDB | None = None, sms: SMSNotifier | None = None, 
     @app.post("/api/auth/picker")
     async def auth_picker(request: Request):
         body = await request.json()
+        ip = request.client.host if request.client else "unknown"
+        if not _check_rate_limit(ip):
+            return JSONResponse({"error": "too many attempts, try again later"}, status_code=429)
         password = body.get("password", "")
         stored = db.get_setting("picker_password", "")
         if stored == "":
@@ -138,11 +141,15 @@ def create_app(db: FulfillmentDB | None = None, sms: SMSNotifier | None = None, 
                 resp = JSONResponse({"status": "ok"})
                 set_auth_cookie(resp, serializer, "picker")
                 return resp
+        _record_failed_attempt(ip)
         return JSONResponse({"error": "wrong password"}, status_code=401)
 
     @app.post("/api/auth/manager")
     async def auth_manager(request: Request):
         body = await request.json()
+        ip = request.client.host if request.client else "unknown"
+        if not _check_rate_limit(ip):
+            return JSONResponse({"error": "too many attempts, try again later"}, status_code=429)
         password = body.get("password", "")
         stored = db.get_setting("manager_password", "")
         if stored == "":
@@ -160,6 +167,7 @@ def create_app(db: FulfillmentDB | None = None, sms: SMSNotifier | None = None, 
                 resp = JSONResponse({"status": "ok"})
                 set_auth_cookie(resp, serializer, "manager")
                 return resp
+        _record_failed_attempt(ip)
         return JSONResponse({"error": "wrong password"}, status_code=401)
 
     @app.get("/api/auth/logout")
