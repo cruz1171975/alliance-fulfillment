@@ -353,3 +353,14 @@ def test_auth_rate_limit_does_not_block_correct_password(db):
     # Correct password should still work
     resp = c.post("/api/auth/picker", json={"password": "secret123"})
     assert resp.status_code == 200
+
+
+def test_release_picker_orders_api(seeded_client, seeded_db):
+    """Manager can release a picker's assigned orders via API."""
+    seeded_client.post("/api/pickers/1/batch")
+    resp = seeded_client.get("/api/pickers/1/orders")
+    assert len(resp.json()) > 0
+    resp = seeded_client.post("/api/pickers/1/release")
+    assert resp.status_code == 200
+    resp = seeded_client.get("/api/pickers/1/orders")
+    assert len(resp.json()) == 0

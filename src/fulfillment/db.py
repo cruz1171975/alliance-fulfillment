@@ -186,19 +186,28 @@ class FulfillmentDB:
 
     def assign_batch(self, picker_id: int, batch_size: int = 8) -> list[QueuedOrder]:
         with self._conn() as conn:
+            now = datetime.now(timezone.utc).isoformat()
+            # Atomic: SELECT + UPDATE in one statement — prevents race condition
+            conn.execute(
+                """UPDATE queued_orders
+                   SET status='assigned', assigned_to_picker=?, assigned_at=?
+                   WHERE id IN (
+                       SELECT id FROM queued_orders
+                       WHERE status = 'queued'
+                       ORDER BY priority_score DESC
+                       LIMIT ?
+                   )""",
+                (picker_id, now, batch_size)
+            )
+            # Now fetch what was just assigned
             rows = conn.execute(
-                "SELECT * FROM queued_orders WHERE status = 'queued' ORDER BY priority_score DESC LIMIT ?",
-                (batch_size,)
+                "SELECT * FROM queued_orders WHERE status='assigned' AND assigned_to_picker=? AND assigned_at=? ORDER BY priority_score DESC",
+                (picker_id, now)
             ).fetchall()
             if not rows:
                 return []
             orders = [self._row_to_order(r) for r in rows]
             order_ids = [o.id for o in orders]
-            now = datetime.now(timezone.utc).isoformat()
-            conn.execute(
-                f"UPDATE queued_orders SET status='assigned', assigned_to_picker=?, assigned_at=? WHERE id IN ({','.join('?' * len(order_ids))})",
-                [picker_id, now] + order_ids
-            )
             cursor = conn.execute(
                 "INSERT INTO batches (picker_id, order_ids_json) VALUES (?, ?)",
                 (picker_id, json.dumps(order_ids))
@@ -311,6 +320,18 @@ class FulfillmentDB:
     def delete_picker(self, picker_id: int):
         with self._conn() as conn:
             conn.execute("DELETE FROM pickers WHERE id=?", (picker_id,))
+
+    def release_picker_orders(self, picker_id: int):
+        """Release all assigned orders for a picker back to queued status."""
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE queued_orders SET status='queued', assigned_to_picker=NULL, assigned_at=NULL WHERE status='assigned' AND assigned_to_picker=?",
+                (picker_id,)
+            )
+            conn.execute(
+                "UPDATE pickers SET status='idle', current_batch_id=NULL WHERE id=?",
+                (picker_id,)
+            )
 
     def remove_shipped_orders(self, active_shipstation_ids: set[int]):
         """Remove orders from queue that are no longer in ShipStation awaiting_shipment."""

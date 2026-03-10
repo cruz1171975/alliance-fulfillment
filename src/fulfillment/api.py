@@ -222,6 +222,13 @@ def create_app(db: FulfillmentDB | None = None, sms: SMSNotifier | None = None, 
         db.delete_picker(picker_id)
         return {"status": "deleted"}
 
+    @app.post("/api/pickers/{picker_id}/release")
+    async def release_picker_orders(picker_id: int, request: Request):
+        if not check_manager_auth(request):
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        db.release_picker_orders(picker_id)
+        return {"status": "released"}
+
     @app.post("/api/pickers/{picker_id}/batch")
     async def request_batch(picker_id: int, request: Request):
         if not check_picker_auth(request):

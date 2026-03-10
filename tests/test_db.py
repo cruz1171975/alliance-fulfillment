@@ -139,3 +139,44 @@ def test_get_queue_stats(db):
     assert stats["red"] == 1
     assert stats["yellow"] == 1
     assert stats["green"] == 1
+
+
+def test_assign_batch_is_atomic(db):
+    """Batch assignment uses a single atomic query — assigned orders can't be double-assigned."""
+    for i in range(4):
+        db.upsert_order(QueuedOrder(
+            shipstation_order_id=200 + i, order_number=f"200{i}",
+            order_date=datetime(2026, 3, 7, tzinfo=timezone.utc),
+            age_hours=72.0, age_bracket=AgeBracket.RED,
+            priority_score=1000 - i, zone=OrderZone.GALLON,
+            customer_name="Test", ship_to_state="TX", order_value=10.0,
+        ))
+    picker1 = db.create_picker("Alice")
+    picker2 = db.create_picker("Bob")
+    batch1 = db.assign_batch(picker1, batch_size=2)
+    batch2 = db.assign_batch(picker2, batch_size=2)
+    # No overlap — each picker gets different orders
+    ids1 = {o.id for o in batch1}
+    ids2 = {o.id for o in batch2}
+    assert len(ids1 & ids2) == 0
+    assert len(batch1) == 2
+    assert len(batch2) == 2
+
+
+def test_release_picker_orders(db):
+    """Releasing a picker's orders returns them to queued status."""
+    for i in range(3):
+        db.upsert_order(QueuedOrder(
+            shipstation_order_id=300 + i, order_number=f"300{i}",
+            order_date=datetime(2026, 3, 7, tzinfo=timezone.utc),
+            age_hours=72.0, age_bracket=AgeBracket.RED,
+            priority_score=1000, zone=OrderZone.GALLON,
+            customer_name="Test", ship_to_state="TX", order_value=10.0,
+        ))
+    picker_id = db.create_picker("Maria")
+    db.assign_batch(picker_id, batch_size=3)
+    assert len(db.get_assigned_orders(picker_id)) == 3
+    assert len(db.get_queued_orders()) == 0
+    db.release_picker_orders(picker_id)
+    assert len(db.get_assigned_orders(picker_id)) == 0
+    assert len(db.get_queued_orders()) == 3

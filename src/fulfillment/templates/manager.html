@@ -144,7 +144,10 @@
                     <td><span class="badge ${p.status}">${p.status}</span></td>
                     <td>${p.current_batch_id || '\u2014'}</td>
                     <td>${p.orders_completed_today || 0}</td>
-                    <td><button class="btn-remove" onclick="removePicker(${p.id}, '${p.name}')">Remove</button></td>
+                    <td>
+                        <button class="btn-remove" onclick="releasePicker(${p.id})" style="background:#3498db;margin-right:4px;">Release</button>
+                        <button class="btn-remove" onclick="removePicker(${p.id}, '${p.name}')">Remove</button>
+                    </td>
                 </tr>
             `).join('');
         }
@@ -166,6 +169,13 @@
             if (!confirm(`Remove picker "${pickerName}"?`)) return;
             await fetch(`/api/pickers/${pickerId}`, { method: 'DELETE' });
             refreshPickers();
+        }
+
+        async function releasePicker(pickerId) {
+            if (!confirm('Release all assigned orders for this picker back to the queue?')) return;
+            await fetch(`/api/pickers/${pickerId}/release`, { method: 'POST' });
+            refreshPickers();
+            refreshStats();
         }
 
         async function refreshSettings() {
