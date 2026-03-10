@@ -96,6 +96,22 @@ def test_create_stock_alert(seeded_client):
     assert len(alerts) == 1
 
 
+def test_create_stock_alert_with_restock_qty(seeded_client):
+    resp = seeded_client.post("/api/alerts/stock", json={
+        "picker_id": 1,
+        "product_name": "Isopropyl Alcohol 1 Gal",
+        "product_sku": "IPA-1GAL",
+        "restock_qty": 10,
+        "order_id": 1,
+        "order_number": "1001",
+    })
+    assert resp.status_code == 200
+    alerts = seeded_client.get("/api/alerts/stock/today").json()
+    assert len(alerts) == 1
+    assert alerts[0]["restock_qty"] == 10
+    assert alerts[0]["order_id"] == 1
+
+
 def test_get_and_set_settings(client):
     resp = client.post("/api/settings", json={"key": "batch_size", "value": "10"})
     assert resp.status_code == 200
@@ -309,3 +325,31 @@ def test_secret_key_auto_generated_when_default(db):
     assert stored != ""
     assert stored != "alliance-fulfillment-secret-change-me"
     assert len(stored) >= 32
+
+
+def test_auth_rate_limited_after_5_failures(db):
+    """After 5 failed login attempts, the 6th returns 429."""
+    from fulfillment.auth import hash_password
+    db.set_setting("picker_password", hash_password("secret123"))
+    app = create_app(db)
+    c = TestClient(app)
+    for i in range(5):
+        resp = c.post("/api/auth/picker", json={"password": "wrong"})
+        assert resp.status_code == 401, f"Attempt {i+1} should be 401"
+    # 6th attempt should be rate limited
+    resp = c.post("/api/auth/picker", json={"password": "wrong"})
+    assert resp.status_code == 429
+
+
+def test_auth_rate_limit_does_not_block_correct_password(db):
+    """Correct password still works within the rate limit window."""
+    from fulfillment.auth import hash_password
+    db.set_setting("picker_password", hash_password("secret123"))
+    app = create_app(db)
+    c = TestClient(app)
+    # 3 failed attempts
+    for _ in range(3):
+        c.post("/api/auth/picker", json={"password": "wrong"})
+    # Correct password should still work
+    resp = c.post("/api/auth/picker", json={"password": "secret123"})
+    assert resp.status_code == 200

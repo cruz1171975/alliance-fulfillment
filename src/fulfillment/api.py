@@ -66,6 +66,27 @@ def create_app(db: FulfillmentDB | None = None, sms: SMSNotifier | None = None, 
 
     serializer = make_serializer(secret_key)
 
+    # Rate limiter for auth endpoints
+    import time as _time
+    _auth_attempts: dict[str, list[float]] = {}
+    _RATE_LIMIT_MAX = 5
+    _RATE_LIMIT_WINDOW = 60.0  # seconds
+
+    def _check_rate_limit(ip: str) -> bool:
+        """Returns True if the request should be allowed, False if rate limited."""
+        now = _time.time()
+        attempts = _auth_attempts.get(ip, [])
+        # Remove attempts outside the window
+        attempts = [t for t in attempts if now - t < _RATE_LIMIT_WINDOW]
+        _auth_attempts[ip] = attempts
+        return len(attempts) < _RATE_LIMIT_MAX
+
+    def _record_failed_attempt(ip: str):
+        now = _time.time()
+        if ip not in _auth_attempts:
+            _auth_attempts[ip] = []
+        _auth_attempts[ip].append(now)
+
     templates_dir = Path(__file__).parent / "templates"
     if templates_dir.exists():
         templates = Jinja2Templates(directory=str(templates_dir))
@@ -261,7 +282,10 @@ def create_app(db: FulfillmentDB | None = None, sms: SMSNotifier | None = None, 
         picker_id = body["picker_id"]
         product_name = body["product_name"]
         product_sku = body.get("product_sku", "")
-        alert_id = db.create_stock_alert(picker_id, product_name, product_sku)
+        restock_qty = body.get("restock_qty", 0)
+        order_id = body.get("order_id")
+        order_number = body.get("order_number", "")
+        alert_id = db.create_stock_alert(picker_id, product_name, product_sku, restock_qty=restock_qty, order_id=order_id)
 
         # Send SMS
         sms_number = db.get_setting("sms_number", "")
@@ -269,7 +293,7 @@ def create_app(db: FulfillmentDB | None = None, sms: SMSNotifier | None = None, 
             picker = db.get_picker(picker_id)
             picker_name = picker["name"] if picker else "Unknown"
             now_str = datetime.now(timezone.utc).strftime("%I:%M %p")
-            message = sms.format_low_stock_message(product_name, picker_name, now_str)
+            message = sms.format_restock_message(product_name, restock_qty, order_number, picker_name, now_str)
             sent = sms.send_sms(sms_number, message)
             if sent:
                 db.mark_alert_sent(alert_id)
