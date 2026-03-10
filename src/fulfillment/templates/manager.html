@@ -231,7 +231,8 @@
             document.getElementById('alerts-area').innerHTML = alerts.map(a => `
                 <div class="alert-item">
                     <span class="alert-time">${a.flagged_at}</span> \u2014
-                    <strong>${a.picker_name}</strong> \u2014 ${a.product_name}
+                    <strong>${a.picker_name}</strong> \u2014
+                    ${a.restock_qty ? a.restock_qty + 'x ' : ''}${a.product_name}
                     ${a.sms_sent ? '(SMS sent)' : ''}
                 </div>
             `).join('');
