@@ -296,3 +296,16 @@ def test_settings_api_does_not_expose_passwords(db):
     assert "manager_password" not in data
     assert data["picker_password_set"] is True
     assert data["manager_password_set"] is False
+
+
+def test_secret_key_auto_generated_when_default(db):
+    """When APP_SECRET_KEY is the default placeholder, a random key is generated and stored."""
+    import os
+    os.environ["APP_SECRET_KEY"] = "alliance-fulfillment-secret-change-me"
+    from fulfillment.config import Config
+    cfg = Config()
+    app = create_app(db)
+    stored = db.get_setting("app_secret_key", "")
+    assert stored != ""
+    assert stored != "alliance-fulfillment-secret-change-me"
+    assert len(stored) >= 32

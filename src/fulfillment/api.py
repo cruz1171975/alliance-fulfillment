@@ -53,7 +53,18 @@ def create_app(db: FulfillmentDB | None = None, sms: SMSNotifier | None = None, 
         from_number=config.twilio_from_number,
     )
 
-    serializer = make_serializer(config.app_secret_key)
+    # Auto-generate secret key if using the default placeholder
+    secret_key = config.app_secret_key
+    if secret_key == "alliance-fulfillment-secret-change-me":
+        stored_key = db.get_setting("app_secret_key", "")
+        if stored_key:
+            secret_key = stored_key
+        else:
+            import secrets
+            secret_key = secrets.token_hex(32)
+            db.set_setting("app_secret_key", secret_key)
+
+    serializer = make_serializer(secret_key)
 
     templates_dir = Path(__file__).parent / "templates"
     if templates_dir.exists():
