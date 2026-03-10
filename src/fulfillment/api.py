@@ -278,8 +278,8 @@ def create_app(db: FulfillmentDB | None = None, sms: SMSNotifier | None = None, 
             "active_picker_slots": db.get_setting("active_picker_slots", str(config.default_picker_slots)),
             "sms_number": db.get_setting("sms_number", ""),
             "refresh_interval": db.get_setting("refresh_interval", str(config.queue_refresh_seconds)),
-            "picker_password": db.get_setting("picker_password", ""),
-            "manager_password": db.get_setting("manager_password", ""),
+            "picker_password_set": db.get_setting("picker_password", "") != "",
+            "manager_password_set": db.get_setting("manager_password", "") != "",
         }
 
     @app.post("/api/settings")

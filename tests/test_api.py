@@ -282,3 +282,17 @@ def test_plain_text_password_auto_migrated(db):
     # After login, password should now be hashed
     stored = db.get_setting("picker_password", "")
     assert stored.startswith("$2b$")
+
+
+def test_settings_api_does_not_expose_passwords(db):
+    """GET /api/settings returns password_set booleans, not actual passwords."""
+    from fulfillment.auth import hash_password
+    db.set_setting("picker_password", hash_password("secret"))
+    app = create_app(db)
+    c = TestClient(app)
+    resp = c.get("/api/settings")
+    data = resp.json()
+    assert "picker_password" not in data
+    assert "manager_password" not in data
+    assert data["picker_password_set"] is True
+    assert data["manager_password_set"] is False

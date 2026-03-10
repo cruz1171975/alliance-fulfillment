@@ -195,13 +195,13 @@
                 <hr style="margin: 1rem 0; border: none; border-top: 1px solid #eee;">
                 <div class="setting-row">
                     <label>Picker password:</label>
-                    <input type="password" id="set-picker-pwd" value="${s.picker_password}" placeholder="Not set">
-                    <button onclick="saveSetting('picker_password', document.getElementById('set-picker-pwd').value)">Save</button>
+                    <input type="password" id="set-picker-pwd" value="" placeholder="${s.picker_password_set ? '(password set)' : 'Not set'}">
+                    <button onclick="savePassword('picker_password', document.getElementById('set-picker-pwd').value)">Save</button>
                 </div>
                 <div class="setting-row">
                     <label>Manager password:</label>
-                    <input type="password" id="set-manager-pwd" value="${s.manager_password}" placeholder="Not set">
-                    <button onclick="saveSetting('manager_password', document.getElementById('set-manager-pwd').value)">Save</button>
+                    <input type="password" id="set-manager-pwd" value="" placeholder="${s.manager_password_set ? '(password set)' : 'Not set'}">
+                    <button onclick="savePassword('manager_password', document.getElementById('set-manager-pwd').value)">Save</button>
                 </div>
             `;
         }
@@ -238,6 +238,16 @@
         }
 
         async function saveSetting(key, value) {
+            await fetch('/api/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({key, value})
+            });
+            refreshSettings();
+        }
+
+        async function savePassword(key, value) {
+            if (!value.trim()) return; // Don't save empty passwords
             await fetch('/api/settings', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
