@@ -16,6 +16,23 @@ def test_format_low_stock_message():
     assert "10:42 AM" in msg
 
 
+def test_format_restock_message():
+    notifier = SMSNotifier("", "", "")
+    msg = notifier.format_restock_message(
+        product_name="Acetone - 1 Gallon",
+        restock_qty=10,
+        order_number="1234",
+        picker_name="Maria",
+        time_str="2:30 PM",
+    )
+    assert "RESTOCK NEEDED" in msg
+    assert "10" in msg
+    assert "Acetone - 1 Gallon" in msg
+    assert "1234" in msg
+    assert "Maria" in msg
+    assert "2:30 PM" in msg
+
+
 def test_send_sms_disabled_when_no_credentials():
     notifier = SMSNotifier(account_sid="", auth_token="", from_number="")
     result = notifier.send_sms("+15551234567", "test message")

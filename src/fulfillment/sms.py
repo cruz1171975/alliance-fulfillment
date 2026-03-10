@@ -30,3 +30,14 @@ class SMSNotifier:
             f"Flagged by: {picker_name}\n"
             f"Time: {time_str}"
         )
+
+    def format_restock_message(
+        self, product_name: str, restock_qty: int, order_number: str, picker_name: str, time_str: str
+    ) -> str:
+        return (
+            f"RESTOCK NEEDED\n"
+            f"{restock_qty} x {product_name}\n"
+            f"Order #{order_number}\n"
+            f"Flagged by: {picker_name}\n"
+            f"Time: {time_str}"
+        )
