@@ -106,6 +106,19 @@ def test_create_stock_alert(db):
     assert alerts[0]["product_name"] == "Isopropyl Alcohol 1 Gal"
 
 
+def test_create_stock_alert_with_restock_qty(db):
+    picker_id = db.create_picker("Maria")
+    alert_id = db.create_stock_alert(
+        picker_id, "Isopropyl Alcohol 1 Gal", "IPA-1GAL",
+        restock_qty=10, order_id=42
+    )
+    alerts = db.get_stock_alerts_today()
+    assert len(alerts) == 1
+    assert alerts[0]["product_name"] == "Isopropyl Alcohol 1 Gal"
+    assert alerts[0]["restock_qty"] == 10
+    assert alerts[0]["order_id"] == 42
+
+
 def test_get_and_set_settings(db):
     db.set_setting("batch_size", "10")
     assert db.get_setting("batch_size", "8") == "10"

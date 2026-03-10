@@ -74,6 +74,8 @@ class FulfillmentDB:
                     picker_id INTEGER NOT NULL,
                     product_name TEXT NOT NULL,
                     product_sku TEXT DEFAULT '',
+                    restock_qty INTEGER DEFAULT 0,
+                    order_id INTEGER,
                     flagged_at TEXT NOT NULL DEFAULT (datetime('now')),
                     sms_sent INTEGER DEFAULT 0,
                     FOREIGN KEY (picker_id) REFERENCES pickers(id)
@@ -84,6 +86,14 @@ class FulfillmentDB:
                     value TEXT NOT NULL
                 );
             """)
+
+            # Migrations for existing databases
+            cursor = conn.execute("PRAGMA table_info(stock_alerts)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if "restock_qty" not in columns:
+                conn.execute("ALTER TABLE stock_alerts ADD COLUMN restock_qty INTEGER DEFAULT 0")
+            if "order_id" not in columns:
+                conn.execute("ALTER TABLE stock_alerts ADD COLUMN order_id INTEGER")
 
     def upsert_order(self, order: QueuedOrder):
         line_items_json = json.dumps([li.model_dump() for li in order.line_items])
@@ -234,11 +244,11 @@ class FulfillmentDB:
             ).fetchone()
             return {"orders_completed_today": row["cnt"]}
 
-    def create_stock_alert(self, picker_id: int, product_name: str, product_sku: str = "") -> int:
+    def create_stock_alert(self, picker_id: int, product_name: str, product_sku: str = "", restock_qty: int = 0, order_id: int | None = None) -> int:
         with self._conn() as conn:
             cursor = conn.execute(
-                "INSERT INTO stock_alerts (picker_id, product_name, product_sku) VALUES (?, ?, ?)",
-                (picker_id, product_name, product_sku)
+                "INSERT INTO stock_alerts (picker_id, product_name, product_sku, restock_qty, order_id) VALUES (?, ?, ?, ?, ?)",
+                (picker_id, product_name, product_sku, restock_qty, order_id)
             )
             return cursor.lastrowid
 
