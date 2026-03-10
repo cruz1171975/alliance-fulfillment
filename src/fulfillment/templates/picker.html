@@ -32,16 +32,17 @@
         .order-card .actions button { flex: 1; padding: 0.5rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
         .btn-complete { background: #27ae60; color: white; }
         .btn-problem { background: #e74c3c; color: white; }
-        .btn-print { background: #3498db; color: white; }
         .zone-divider { text-align: center; color: #999; font-size: 0.8rem; margin: 0.5rem 0; padding: 0.25rem; border-top: 1px dashed #ddd; }
         .get-batch-btn { width: 100%; padding: 1rem; font-size: 1.1rem; background: #1a1a2e; color: white; border: none; border-radius: 8px; cursor: pointer; margin: 1rem 0; }
         .get-batch-btn:disabled { background: #999; cursor: not-allowed; }
-        .stock-alert { background: white; border-radius: 8px; padding: 1rem; margin-top: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .stock-alert input { width: 70%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; }
-        .stock-alert button { width: 25%; padding: 0.5rem; background: #e67e22; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 4%; }
         .status-msg { text-align: center; padding: 0.5rem; margin: 0.5rem 0; border-radius: 4px; font-size: 0.9rem; }
         .status-msg.success { background: #d4edda; color: #155724; }
         .status-msg.error { background: #f8d7da; color: #721c24; }
+        .restock-row { display: flex; align-items: center; gap: 0.25rem; margin-top: 0.25rem; }
+        .restock-row input { width: 60px; padding: 0.25rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.8rem; text-align: center; }
+        .restock-row button { padding: 0.25rem 0.5rem; background: #e67e22; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
+        .restock-row .restock-sent { color: #27ae60; font-size: 0.8rem; font-weight: bold; }
+        .print-all-btn { width: 100%; padding: 0.75rem; font-size: 1rem; background: #3498db; color: white; border: none; border-radius: 8px; cursor: pointer; margin-bottom: 0.5rem; }
         #batch-container { min-height: 200px; }
     </style>
 </head>
@@ -75,19 +76,13 @@
             <div id="status-area"></div>
 
             <div id="batch-container"></div>
-
-            <!-- Low Stock Alert -->
-            <div class="stock-alert">
-                <strong>Flag Low Stock:</strong><br>
-                <input type="text" id="stock-product" placeholder="Product name...">
-                <button onclick="flagLowStock()">Send</button>
-            </div>
         </div>
     </div>
 
     <script>
         let pickerId = null;
         let pickerName = '';
+        let currentBatchOrderIds = [];
 
         async function loadPickers() {
             const resp = await fetch('/api/pickers');
@@ -140,26 +135,41 @@
             const container = document.getElementById('batch-container');
             if (orders.length === 0) {
                 container.innerHTML = '<div class="status-msg">No orders in queue right now. Check back soon.</div>';
+                currentBatchOrderIds = [];
                 return;
             }
+            currentBatchOrderIds = orders.map(o => o.id);
             let html = `<div class="batch-header"><strong>Your Batch (${orders.length} orders)</strong></div>`;
+            html += `<button class="print-all-btn" onclick="printAllSlips()">Print All Slips</button>`;
             let lastZone = '';
             for (const order of orders) {
                 if (order.zone !== lastZone && lastZone !== '') {
                     html += `<div class="zone-divider">Zone: ${lastZone} \u2192 ${order.zone}</div>`;
                 }
                 lastZone = order.zone;
-                const items = order.line_items.map(li => `${li.quantity}x ${li.name}`).join(', ');
+                let itemsHtml = '';
+                for (let idx = 0; idx < order.line_items.length; idx++) {
+                    const li = order.line_items[idx];
+                    const sku = li.sku || '';
+                    const name = li.name || '';
+                    const escapedName = name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const escapedSku = sku.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    itemsHtml += `
+                        <div class="restock-row" id="restock-${order.id}-${idx}">
+                            <span>${li.quantity}x ${name}</span>
+                            <input type="number" min="1" placeholder="Restock qty" id="qty-${order.id}-${idx}">
+                            <button onclick="flagRestock(${order.id}, '${order.order_number}', '${escapedName}', '${escapedSku}', ${idx})">Restock</button>
+                        </div>`;
+                }
                 html += `
-                    <div class="order-card ${order.age_bracket}">
+                    <div class="order-card ${order.age_bracket}" id="order-${order.id}">
                         <div class="order-header">
                             <span>#${order.order_number}</span>
                             <span class="order-age">${Math.round(order.age_hours)}h old</span>
                         </div>
-                        <div class="order-items">${items}</div>
+                        <div class="order-items">${itemsHtml}</div>
                         <div class="order-customer">${order.customer_name} \u2014 ${order.ship_to_state}</div>
                         <div class="actions">
-                            <button class="btn-print" onclick="printSlip(${order.id})">Print Slip</button>
                             <button class="btn-complete" onclick="completeOrder(${order.id})">Complete</button>
                             <button class="btn-problem" onclick="problemOrder(${order.id})">Problem</button>
                         </div>
@@ -168,8 +178,31 @@
             container.innerHTML = html;
         }
 
-        function printSlip(orderId) {
-            window.open(`/api/orders/${orderId}/packing-slip`, '_blank');
+        function printAllSlips() {
+            for (const orderId of currentBatchOrderIds) {
+                window.open(`/api/orders/${orderId}/packing-slip`, '_blank');
+            }
+        }
+
+        async function flagRestock(orderId, orderNumber, productName, productSku, idx) {
+            const input = document.getElementById(`qty-${orderId}-${idx}`);
+            const qty = parseInt(input.value);
+            if (!qty || qty < 1 || !pickerId) return;
+            await fetch('/api/alerts/stock', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    picker_id: pickerId,
+                    product_name: productName,
+                    product_sku: productSku,
+                    restock_qty: qty,
+                    order_id: orderId,
+                    order_number: orderNumber,
+                })
+            });
+            const row = document.getElementById(`restock-${orderId}-${idx}`);
+            row.querySelector('input').style.display = 'none';
+            row.querySelector('button').outerHTML = '<span class="restock-sent">\u2713 Sent</span>';
         }
 
         async function completeOrder(orderId) {
@@ -194,20 +227,6 @@
             const card = event.target.closest('.order-card');
             card.style.opacity = '0.3';
             card.querySelector('.actions').innerHTML = '<span class="status-msg error">Flagged</span>';
-        }
-
-        async function flagLowStock() {
-            const product = document.getElementById('stock-product').value.trim();
-            if (!product || !pickerId) return;
-            await fetch('/api/alerts/stock', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({picker_id: pickerId, product_name: product})
-            });
-            document.getElementById('stock-product').value = '';
-            const area = document.getElementById('status-area');
-            area.innerHTML = '<div class="status-msg success">Low stock alert sent!</div>';
-            setTimeout(() => area.innerHTML = '', 3000);
         }
 
         // Load pickers on page load
