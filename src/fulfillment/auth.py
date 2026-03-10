@@ -1,6 +1,25 @@
+from passlib.hash import bcrypt
+
 from itsdangerous import URLSafeTimedSerializer
 from fastapi import Request, Response
 from fulfillment.db import FulfillmentDB
+
+
+def hash_password(password: str) -> str:
+    """Hash a password using bcrypt."""
+    return bcrypt.hash(password)
+
+
+def verify_password(password: str, stored_hash: str) -> bool:
+    """Verify a password against a bcrypt hash. Returns False for empty hash."""
+    if not stored_hash:
+        return False
+    return bcrypt.verify(password, stored_hash)
+
+
+def is_bcrypt_hash(value: str) -> bool:
+    """Check if a string looks like a bcrypt hash."""
+    return value.startswith("$2b$") and len(value) >= 59
 
 
 def make_serializer(secret_key: str) -> URLSafeTimedSerializer:
