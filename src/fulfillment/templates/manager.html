@@ -104,6 +104,11 @@
     </div>
 
     <script>
+        function esc(str) {
+            if (str == null) return '';
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+        }
+
         async function refreshAll() {
             await Promise.all([
                 refreshStats(),
@@ -140,13 +145,13 @@
             }
             document.getElementById('pickers-table').innerHTML = pickers.map(p => `
                 <tr>
-                    <td>${p.name}</td>
-                    <td><span class="badge ${p.status}">${p.status}</span></td>
+                    <td>${esc(p.name)}</td>
+                    <td><span class="badge ${esc(p.status)}">${esc(p.status)}</span></td>
                     <td>${p.current_batch_id || '\u2014'}</td>
                     <td>${p.orders_completed_today || 0}</td>
                     <td>
                         <button class="btn-remove" onclick="releasePicker(${p.id})" style="background:#3498db;margin-right:4px;">Release</button>
-                        <button class="btn-remove" onclick="removePicker(${p.id}, '${p.name}')">Remove</button>
+                        <button class="btn-remove" onclick="removePicker(${p.id})">Remove</button>
                     </td>
                 </tr>
             `).join('');
@@ -165,8 +170,8 @@
             refreshPickers();
         }
 
-        async function removePicker(pickerId, pickerName) {
-            if (!confirm(`Remove picker "${pickerName}"?`)) return;
+        async function removePicker(pickerId) {
+            if (!confirm('Remove this picker?')) return;
             await fetch(`/api/pickers/${pickerId}`, { method: 'DELETE' });
             refreshPickers();
         }
@@ -225,8 +230,8 @@
             }
             document.getElementById('problems-area').innerHTML = problems.map(p => `
                 <div class="problem-item">
-                    <strong>#${p.order_number}</strong> \u2014 ${p.customer_name}
-                    <div class="reason">${p.problem_reason}</div>
+                    <strong>#${esc(p.order_number)}</strong> \u2014 ${esc(p.customer_name)}
+                    <div class="reason">${esc(p.problem_reason)}</div>
                 </div>
             `).join('');
         }
@@ -240,9 +245,9 @@
             }
             document.getElementById('alerts-area').innerHTML = alerts.map(a => `
                 <div class="alert-item">
-                    <span class="alert-time">${a.flagged_at}</span> \u2014
-                    <strong>${a.picker_name}</strong> \u2014
-                    ${a.restock_qty ? a.restock_qty + 'x ' : ''}${a.product_name}
+                    <span class="alert-time">${esc(a.flagged_at)}</span> \u2014
+                    <strong>${esc(a.picker_name)}</strong> \u2014
+                    ${a.restock_qty ? a.restock_qty + 'x ' : ''}${esc(a.product_name)}
                     ${a.sms_sent ? '(SMS sent)' : ''}
                 </div>
             `).join('');

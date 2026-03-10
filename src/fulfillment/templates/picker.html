@@ -80,6 +80,11 @@
     </div>
 
     <script>
+        function esc(str) {
+            if (str == null) return '';
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+        }
+
         let pickerId = null;
         let pickerName = '';
         let currentBatchOrderIds = [];
@@ -144,7 +149,7 @@
             let lastZone = '';
             for (const order of orders) {
                 if (order.zone !== lastZone && lastZone !== '') {
-                    html += `<div class="zone-divider">Zone: ${lastZone} \u2192 ${order.zone}</div>`;
+                    html += `<div class="zone-divider">Zone: ${esc(lastZone)} \u2192 ${esc(order.zone)}</div>`;
                 }
                 lastZone = order.zone;
                 let itemsHtml = '';
@@ -152,23 +157,23 @@
                     const li = order.line_items[idx];
                     const sku = li.sku || '';
                     const name = li.name || '';
-                    const escapedName = name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    const escapedSku = sku.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const escapedName = esc(name);
+                    const escapedSku = esc(sku);
                     itemsHtml += `
                         <div class="restock-row" id="restock-${order.id}-${idx}">
-                            <span>${li.quantity}x ${name}</span>
+                            <span>${li.quantity}x ${esc(li.name)}</span>
                             <input type="number" min="1" placeholder="Restock qty" id="qty-${order.id}-${idx}">
-                            <button onclick="flagRestock(${order.id}, '${order.order_number}', '${escapedName}', '${escapedSku}', ${idx})">Restock</button>
+                            <button onclick="flagRestock(${order.id}, '${esc(order.order_number)}', '${escapedName}', '${escapedSku}', ${idx})">Restock</button>
                         </div>`;
                 }
                 html += `
-                    <div class="order-card ${order.age_bracket}" id="order-${order.id}">
+                    <div class="order-card ${esc(order.age_bracket)}" id="order-${order.id}">
                         <div class="order-header">
-                            <span>#${order.order_number}</span>
+                            <span>#${esc(order.order_number)}</span>
                             <span class="order-age">${Math.round(order.age_hours)}h old</span>
                         </div>
                         <div class="order-items">${itemsHtml}</div>
-                        <div class="order-customer">${order.customer_name} \u2014 ${order.ship_to_state}</div>
+                        <div class="order-customer">${esc(order.customer_name)} \u2014 ${esc(order.ship_to_state)}</div>
                         <div class="actions">
                             <button class="btn-complete" onclick="completeOrder(${order.id})">Complete</button>
                             <button class="btn-problem" onclick="problemOrder(${order.id})">Problem</button>
