@@ -95,21 +95,21 @@ def _build_slip_elements(order: QueuedOrder, shipstation_order: dict | None = No
     """Build the reportlab flowable elements for a single packing slip."""
     styles = getSampleStyleSheet()
     title_style = styles["Heading1"]
-    title_style.fontSize = 18
-    title_style.leading = 20
+    title_style.fontSize = 8
+    title_style.leading = 10
     title_style.spaceAfter = 2
 
     normal = styles["Normal"]
-    normal.fontSize = 12
-    normal.leading = 14
+    normal.fontSize = 10
+    normal.leading = 12
 
     small = styles["Normal"].clone("small_slip")
     small.fontSize = 10
     small.leading = 12
 
     item_style = styles["Normal"].clone("item_slip")
-    item_style.fontSize = 12
-    item_style.leading = 14
+    item_style.fontSize = 10
+    item_style.leading = 12
 
     elements = []
 
@@ -162,8 +162,8 @@ def _build_slip_elements(order: QueuedOrder, shipstation_order: dict | None = No
     col_widths = [0.4 * inch, 2.2 * inch, 0.9 * inch]
     table = Table(table_data, colWidths=col_widths)
     table.setStyle(TableStyle([
-        ("FONTSIZE", (0, 0), (-1, -1), 12),
-        ("LEADING", (0, 0), (-1, -1), 14),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("LEADING", (0, 0), (-1, -1), 12),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("BOTTOMPADDING", (0, 0), (-1, 0), 4),
         ("TOPPADDING", (0, 0), (-1, -1), 2),
