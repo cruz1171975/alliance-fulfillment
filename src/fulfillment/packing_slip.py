@@ -120,11 +120,6 @@ def _build_slip_elements(order: QueuedOrder, shipstation_order: dict | None = No
     elements.append(BarcodeFlowable(order.order_number))
     elements.append(Spacer(1, 4))
 
-    # Date
-    order_date_str = order.order_date.strftime("%m/%d/%Y")
-    elements.append(Paragraph(f"Date: {order_date_str}", small))
-    elements.append(Spacer(1, 6))
-
     # Ship To
     elements.append(Paragraph("<b>SHIP TO:</b>", normal))
     if shipstation_order and shipstation_order.get("shipTo"):
