@@ -184,9 +184,7 @@
         }
 
         function printAllSlips() {
-            for (const orderId of currentBatchOrderIds) {
-                window.open(`/api/orders/${orderId}/packing-slip`, '_blank');
-            }
+            window.open(`/api/pickers/${pickerId}/batch/packing-slips`, '_blank');
         }
 
         async function flagRestock(orderId, orderNumber, productName, productSku, idx) {

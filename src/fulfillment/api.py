@@ -287,6 +287,30 @@ def create_app(db: FulfillmentDB | None = None, sms: SMSNotifier | None = None, 
             headers={"Content-Disposition": f"inline; filename=packing-slip-{order.order_number}.pdf"}
         )
 
+    @app.get("/api/pickers/{picker_id}/batch/packing-slips")
+    async def get_batch_packing_slips(picker_id: int, request: Request):
+        if not check_picker_auth(request):
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        orders = db.get_assigned_orders(picker_id)
+        if not orders:
+            return JSONResponse({"error": "no assigned orders"}, status_code=404)
+        slips = []
+        for order in orders:
+            ss_order_dict = None
+            try:
+                ss_order = await ss_api.get_order(order.shipstation_order_id)
+                ss_order_dict = ss_order.model_dump()
+            except Exception:
+                pass
+            slips.append((order, ss_order_dict))
+        from fulfillment.packing_slip import generate_batch_packing_slips
+        pdf_bytes = generate_batch_packing_slips(slips)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": "inline; filename=batch-packing-slips.pdf"}
+        )
+
     # --- Stock Alerts ---
 
     @app.post("/api/alerts/stock")
