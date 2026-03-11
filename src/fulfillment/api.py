@@ -287,15 +287,21 @@ def create_app(db: FulfillmentDB | None = None, sms: SMSNotifier | None = None, 
             headers={"Content-Disposition": f"inline; filename=packing-slip-{order.order_number}.pdf"}
         )
 
-    @app.get("/api/pickers/{picker_id}/batch/packing-slips")
-    async def get_batch_packing_slips(picker_id: int, request: Request):
+    @app.get("/api/batch/packing-slips")
+    async def get_batch_packing_slips(request: Request):
         if not check_picker_auth(request):
             return JSONResponse({"error": "unauthorized"}, status_code=401)
-        orders = db.get_assigned_orders(picker_id)
-        if not orders:
-            return JSONResponse({"error": "no assigned orders"}, status_code=404)
+        ids_param = request.query_params.get("ids", "")
+        if not ids_param:
+            return JSONResponse({"error": "no order ids provided"}, status_code=400)
+        order_ids = [int(x) for x in ids_param.split(",") if x.strip()]
+        if not order_ids:
+            return JSONResponse({"error": "no order ids provided"}, status_code=400)
         slips = []
-        for order in orders:
+        for oid in order_ids:
+            order = db.get_order_by_id(oid)
+            if not order:
+                continue
             ss_order_dict = None
             try:
                 ss_order = await ss_api.get_order(order.shipstation_order_id)
@@ -303,6 +309,8 @@ def create_app(db: FulfillmentDB | None = None, sms: SMSNotifier | None = None, 
             except Exception:
                 pass
             slips.append((order, ss_order_dict))
+        if not slips:
+            return JSONResponse({"error": "no orders found"}, status_code=404)
         from fulfillment.packing_slip import generate_batch_packing_slips
         pdf_bytes = generate_batch_packing_slips(slips)
         return Response(

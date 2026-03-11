@@ -184,7 +184,8 @@
         }
 
         function printAllSlips() {
-            window.open(`/api/pickers/${pickerId}/batch/packing-slips`, '_blank');
+            if (currentBatchOrderIds.length === 0) return;
+            window.open(`/api/batch/packing-slips?ids=${currentBatchOrderIds.join(',')}`, '_blank');
         }
 
         async function flagRestock(orderId, orderNumber, productName, productSku, idx) {
